@@ -3,6 +3,7 @@ import json
 import time
 import pandas as pd
 from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
 import os
 import logging
 
@@ -11,28 +12,26 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class BatchPublisher:
-    def __init__(self, broker_list, batch_size=100, topic='sensor-data'):
+    def __init__(self, broker_list, batch_size=10, topic='sensor-data'):
         self.batch_size = batch_size
         self.topic = topic
         self.producer = KafkaProducer(
             bootstrap_servers=broker_list,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-            batch_size=16384,
-            linger_ms=10
+            retries=5,
+            request_timeout_ms=30000
         )
-        logger.info(f"Initialized publisher with batch size {batch_size}")
+        logger.info(f"publisher 5 initialized with {len(broker_list)} brokers")
 
     def publish_data(self, data_file):
-        """Publish data from CSV file in batches"""
+        """Publish data from CSV file"""
         try:
             # Read CSV file
             df = pd.read_csv(data_file)
             total_records = len(df)
-            logger.info(f"Loaded {total_records} records from {data_file}")
+            logger.info(f"publisher 5: Loaded {total_records} records from {data_file}")
 
-            records_published = 0
-            batch_records = []
-
+            success_count = 0
             for _, row in df.iterrows():
                 record = {
                     'id': int(row['id']),
@@ -43,50 +42,55 @@ class BatchPublisher:
                     'household_id': int(row['household_id']),
                     'house_id': int(row['house_id'])
                 }
-                batch_records.append(record)
-
-                # Publish batch when size reached
-                if len(batch_records) >= self.batch_size:
-                    self._publish_batch(batch_records)
-                    records_published += len(batch_records)
-                    batch_records = []
-                    logger.info(f"Published {records_published}/{total_records} records")
-
-            # Publish remaining records
-            if batch_records:
-                self._publish_batch(batch_records)
-                records_published += len(batch_records)
+                
+                # Send each record individually with confirmation
+                future = self.producer.send(self.topic, value=record)
+                future.get(timeout=10)  # Wait for confirmation
+                success_count += 1
+                logger.info(f"publisher 5: Successfully sent record {record['id']} ({success_count}/{total_records})")
+                time.sleep(0.2)
 
             # Wait for all messages to be delivered
             self.producer.flush()
-            logger.info(f"Completed publishing {records_published} records")
+            logger.info(f"publisher 5: Completed publishing {success_count} records")
 
         except Exception as e:
-            logger.error(f"Error publishing data: {e}")
+            logger.error(f"publisher 5: Error publishing data: {e}")
             raise
 
-    def _publish_batch(self, batch):
-        """Publish a batch of records"""
-        for record in batch:
-            self.producer.send(self.topic, value=record)
-        
-        logger.debug(f"Sent batch of {len(batch)} records")
+def wait_for_kafka(broker_list, max_retries=30, retry_interval=5):
+    """Wait for Kafka brokers to be available"""
+    for attempt in range(max_retries):
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers=broker_list,
+                value_serializer=lambda v: json.dumps(v).encode('utf-8')
+            )
+            future = producer.send('test-connection', b'test')
+            future.get(timeout=10)
+            producer.close()
+            logger.info(f"Kafka brokers are available after {attempt * retry_interval} seconds")
+            return True
+        except Exception as e:
+            logger.warning(f"Attempt {attempt + 1}/{max_retries}: Kafka not ready, waiting {retry_interval} seconds...")
+            time.sleep(retry_interval)
+    return False
 
 def main():
-    # Configuration
-    KAFKA_BROKERS = os.getenv('KAFKA_BROKERS', 'localhost:9092,localhost:9093').split(',')
+    KAFKA_BROKERS = ['kafka1:9092', 'kafka2:9093']
     DATA_FILE = os.getenv('DATA_FILE', '/app/data.csv')
-    BATCH_SIZE = int(os.getenv('BATCH_SIZE', '100'))
+    BATCH_SIZE = int(os.getenv('BATCH_SIZE', '10'))
 
-    logger.info(f"Starting publisher with brokers: {KAFKA_BROKERS}")
-    logger.info(f"Data file: {DATA_FILE}, Batch size: {BATCH_SIZE}")
+    logger.info(f"publisher 5: Starting with brokers: {KAFKA_BROKERS}")
+    logger.info(f"publisher 5: Data file: {DATA_FILE}")
 
-    # Create and run publisher
-    publisher = BatchPublisher(KAFKA_BROKERS, batch_size=BATCH_SIZE)
-    
     # Wait for Kafka to be ready
-    time.sleep(10)
-    
+    logger.info("publisher 5: Waiting for Kafka brokers to be ready...")
+    if not wait_for_kafka(KAFKA_BROKERS, max_retries=40, retry_interval=5):
+        logger.error("publisher 5: Failed to connect to Kafka brokers after multiple attempts")
+        return
+
+    publisher = BatchPublisher(KAFKA_BROKERS, batch_size=BATCH_SIZE)
     publisher.publish_data(DATA_FILE)
 
 if __name__ == "__main__":
