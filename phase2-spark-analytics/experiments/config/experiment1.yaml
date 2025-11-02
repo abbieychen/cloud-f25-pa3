@@ -1,0 +1,16 @@
+experiment_name: "M10_R2"
+parameters:
+  M: 10
+  R: 2
+  num_partitions: 10
+  shuffle_partitions: 2
+iterations: 10
+spark_config:
+  spark.sql.adaptive.enabled: "true"
+  spark.sql.adaptive.coalescePartitions.enabled: "true"
+  spark.sql.shuffle.partitions: 2
+  spark.default.parallelism: 10
+analytics:
+  - average_load_per_plug
+  - total_work_per_house
+description: "Small configuration with 10 map partitions and 2 reduce partitions"

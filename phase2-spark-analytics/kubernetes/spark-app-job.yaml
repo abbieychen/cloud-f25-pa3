@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spark-analytics-job
+  namespace: team-namespace
+  labels:
+    app: spark-analytics
+    job: analytics
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: spark-analytics
+        job: analytics
+    spec:
+      serviceAccountName: spark-service-account
+      restartPolicy: OnFailure
+      containers:
+      - name: spark-analytics
+        image: registry1.team-namespace/spark-app:pa3
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: SPARK_MASTER_URL
+          value: "spark://spark-master:7077"
+        - name: DB_HOST
+          value: "mysql-service"
+        - name: DB_PORT
+          value: "3306"
+        - name: DB_USER
+          value: "energy_user"
+        - name: DB_PASSWORD
+          value: "energy_pass"
+        - name: DB_NAME
+          value: "energy_db"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: spark-results
+          mountPath: /opt/spark/results
+        - name: spark-experiments
+          mountPath: /opt/spark/experiments
+      volumes:
+      - name: spark-results
+        persistentVolumeClaim:
+          claimName: spark-results-pvc
+      - name: spark-experiments
+        persistentVolumeClaim:
+          claimName: spark-experiments-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spark-results-pvc
+  namespace: team-namespace
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spark-experiments-pvc
+  namespace: team-namespace
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
