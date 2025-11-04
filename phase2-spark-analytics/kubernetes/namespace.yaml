@@ -1,21 +1,21 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: team-namespace
+  name: team6
   labels:
-    name: team-namespace
-    project: cs4287-pa3
+    name: team6
+    project: cs3891-pa3
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: spark-service-account
-  namespace: team-namespace
+  namespace: team6
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: team-namespace
+  namespace: team6
   name: spark-role
 rules:
 - apiGroups: [""]
@@ -32,11 +32,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: spark-role-binding
-  namespace: team-namespace
+  namespace: team6
 subjects:
 - kind: ServiceAccount
   name: spark-service-account
-  namespace: team-namespace
+  namespace: team6
 roleRef:
   kind: Role
   name: spark-role
