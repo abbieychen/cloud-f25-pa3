@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-worker
+  namespace: team6
+spec:
+  replicas: 3  # Start with 3 workers, scale as needed
+  selector:
+    matchLabels:
+      component: spark-worker
+  template:
+    metadata:
+      labels:
+        component: spark-worker
+    spec:
+      serviceAccountName: spark-service-account
+      containers:
+      - name: spark-worker
+        image: 192.168.1.211:5000/team6/spark-worker:pa3
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8081
+        env:
+        - name: SPARK_WORKER_CORES
+          value: "2"
+        - name: SPARK_WORKER_MEMORY
+          value: "2g"
+        - name: SPARK_MASTER
+          value: "spark://spark-master:7077"

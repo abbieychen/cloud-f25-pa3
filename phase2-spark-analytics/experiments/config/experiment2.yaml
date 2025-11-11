@@ -1,0 +1,16 @@
+experiment_name: "M50_R5"
+parameters:
+  M: 50
+  R: 5
+  num_partitions: 50
+  shuffle_partitions: 5
+iterations: 10
+spark_config:
+  spark.sql.adaptive.enabled: "true"
+  spark.sql.adaptive.coalescePartitions.enabled: "true"
+  spark.sql.shuffle.partitions: 5
+  spark.default.parallelism: 50
+analytics:
+  - average_load_per_plug
+  - total_work_per_house
+description: "Medium configuration with 50 map partitions and 5 reduce partitions"

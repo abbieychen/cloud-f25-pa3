@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: team-namespace
+  labels:
+    app: mysql
+    component: database
+spec:
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
+  selector:
+    app: mysql
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: team-namespace
+  labels:
+    app: mysql
+    component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "rootpassword"
+        - name: MYSQL_DATABASE
+          value: "energy_db"
+        - name: MYSQL_USER
+          value: "energy_user"
+        - name: MYSQL_PASSWORD
+          value: "energy_pass"
+        ports:
+        - containerPort: 3306
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        - name: mysql-init
+          mountPath: /docker-entrypoint-initdb.d
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping", "-h", "localhost"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command: ["mysql", "-h", "localhost", "-u", "root", "-prootpassword", "-e", "SELECT 1"]
+          initialDelaySeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 1
+      volumes:
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+      - name: mysql-init
+        configMap:
+          name: mysql-init-script
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: team-namespace
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-script
+  namespace: team-namespace
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS energy_db;
+    USE energy_db;
+    
+    CREATE USER IF NOT EXISTS 'energy_user'@'%' IDENTIFIED BY 'energy_pass';
+    GRANT ALL PRIVILEGES ON energy_db.* TO 'energy_user'@'%';
+    FLUSH PRIVILEGES;

@@ -1,0 +1,16 @@
+experiment_name: "M100_R10"
+parameters:
+  M: 100
+  R: 10
+  num_partitions: 100
+  shuffle_partitions: 10
+iterations: 10
+spark_config:
+  spark.sql.adaptive.enabled: "true"
+  spark.sql.adaptive.coalescePartitions.enabled: "true"
+  spark.sql.shuffle.partitions: 10
+  spark.default.parallelism: 100
+analytics:
+  - average_load_per_plug
+  - total_work_per_house
+description: "Large configuration with 100 map partitions and 10 reduce partitions"

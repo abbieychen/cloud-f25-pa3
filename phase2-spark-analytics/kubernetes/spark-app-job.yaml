@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spark-energy-analysis
+  namespace: team6
+spec:
+  template:
+    spec:
+      serviceAccountName: spark-service-account
+      containers:
+      - name: spark-app
+        image: 192.168.1.211:5000/team6/spark-app:pa3
+        imagePullPolicy: Always
+        env:
+        - name: SPARK_MASTER
+          value: "spark://spark-master:7077"
+        - name: M
+          value: "10"  # Number of map tasks
+        - name: R
+          value: "2"   # Number of reduce tasks
+        - name: DATABASE_URL
+          value: "your_database_connection_string"
+      restartPolicy: Never
+  backoffLimit: 4
